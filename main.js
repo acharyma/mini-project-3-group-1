@@ -1,3 +1,5 @@
+const listeners = { brushed: null };
+
 d3.csv('cleanData.csv', d3.autoType).then(data=>{
     console.log(data);
 
@@ -10,7 +12,7 @@ d3.csv('cleanData.csv', d3.autoType).then(data=>{
 
 
     var actualData = data.filter(d => d.agriculturePercentGDP != "..");
-    var scatterData = data.filter(d => d.time === 2014).filter(d => d.development !== null);
+    var scatterData = data.filter(d => d.time === 2014).filter(d => d.development !== null).filter(d => d.agriculturePercentGDP != "..").filter(d => d.manufacturingPercentGDP != "..").filter(d => d.industryPercentGDP != "..");
     
     console.log(scatterData);
 
@@ -172,12 +174,18 @@ d3.csv('cleanData.csv', d3.autoType).then(data=>{
     //     // hide the tooltip
     //     d3.select(".tooltip").style("display","none");
     // });
-    const lc = lineChart(".chart-container1");
-    lc.update(actualData);
+    //const lc = lineChart(".chart-container1");
+    //lc.update(actualData);
 
     const sp = scatterPlot(".chart-container2");
     sp.update(scatterData);
 
+    const lc = lineChart(".chart-container1");
+    lc.update(actualData);
+
+    sp.on("brushed", (range)=>{
+        lineChart.filterByDate(range); // coordinating with stackedAreaChart
+    })
     
     
 
@@ -213,6 +221,11 @@ function lineChart(container) {
         .attr("class", "axis y-axis")
         .attr("transform", `translate(${margin.left}, ${margin.top})`)
         .call(yAxis);
+
+    function filterByDate(range) {
+        xDomain = range;
+        update(data);
+    }
 
 
     function update(data){ 
@@ -268,17 +281,39 @@ function scatterPlot(container) {
         .attr("transform", `translate(${margin.left}, ${margin.top})`)
         .call(yAxis);
 
+    const brush = d3
+        .brushX()
+        .extent([
+          [margin.left, margin.top],
+          [width + margin.left, height + margin.top],
+        ])
+        .on("brush", brushed);
+    
+        svg.append("g").attr("class", "brush").call(brush);
+    
+        function brushed(event) {
+            if (event.selection) {
+            console.log("brushed", event.selection);
+            const select = event.selection.map((d) => d - margin.left);
+            listeners["brushed"](select.map(xScale.invert));
+            }
+        }
+
 
     function update(data){ 
-        console.log(d3.extent(data.map((d) => d.manufacturingPercentGDP)));
-        console.log(d3.extent(data, (d => d.industryPercentGDP)));
+        console.log(d3.extent(data.map((d) => d.manufacturingPercentGDP + d.industryPercentGDP)));
+        console.log(d3.extent(data, (d => d.agriculturePercentGDP)));
 
-
-        xScale.domain(d3.extent(data.map((d) => d.manufacturingPercentGDP)));
-        yScale.domain(d3.extent(data, (d => d.industryPercentGDP)));
+        xScale.domain(d3.extent(data.map((d) => d.manufacturingPercentGDP + d.industryPercentGDP)));
+        yScale.domain(d3.extent(data, (d => d.agriculturePercentGDP)));
 
         xAxisUp.call(xAxis);
         yAxisUp.call(yAxis);
+
+        //offsets window scrolling on the tooltip
+        const winScroll = function (e) {
+            return (window.scrollY); // Value of scroll Y in px
+        }
 
         svg
         .selectAll("circle")
@@ -286,8 +321,8 @@ function scatterPlot(container) {
         .enter()
         .append("circle")
         .attr("fill", (d) => ordinalColorScale(d.countryName))
-        .attr('cx', d => xScale(d.manufacturingPercentGDP))
-        .attr('cy', d => yScale(d.industryPercentGDP))
+        .attr('cx', d => margin.left+xScale(d.manufacturingPercentGDP + d.industryPercentGDP))
+        .attr('cy', d => margin.top+yScale(d.agriculturePercentGDP))
         .attr("r", 2)
         .on("mouseenter", (event, d) => {
             // show the tooltip
@@ -296,7 +331,7 @@ function scatterPlot(container) {
             .select(".tooltip")
             .style("position", "fixed")
             .style("left", pos[0] + 10 + "px")
-            .style("top", pos[1] + 10 + "px")
+            .style("top", pos[1] - winScroll() + "px")
             .style("padding", 5 + "px")
             .style("background", "darkgrey")
             .style("font-size", "9px")
@@ -344,7 +379,12 @@ function scatterPlot(container) {
 
     }
 
-    return {
+    function on(event, listener) {
+        listeners[event] = listener;
+    }
+
+	return {
         update, // ES6 shorthand for "update": update
+        on,
 	};
 }
