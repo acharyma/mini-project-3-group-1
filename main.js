@@ -282,7 +282,7 @@ function scatterPlot(container) {
         .call(yAxis);
 
     const brush = d3
-        .brushX()
+        .brush()
         .extent([
           [margin.left, margin.top],
           [width + margin.left, height + margin.top],
@@ -323,7 +323,7 @@ function scatterPlot(container) {
         .attr("fill", (d) => ordinalColorScale(d.countryName))
         .attr('cx', d => margin.left+xScale(d.manufacturingPercentGDP + d.industryPercentGDP))
         .attr('cy', d => margin.top+yScale(d.agriculturePercentGDP))
-        .attr("r", 2)
+        .attr("r", 4)
         .on("mouseenter", (event, d) => {
             // show the tooltip
             const pos = d3.pointer(event, window);
